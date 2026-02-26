@@ -2,7 +2,7 @@
 """三国狼人杀游戏工具函数"""
 import asyncio
 import random
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Sequence
 from collections import Counter
 
 from agentscope.agent import AgentBase
@@ -18,15 +18,14 @@ CHINESE_NAMES = [
     "吕布", "貂蝉", "董卓", "袁绍", "袁术"
 ]
 
-
-def get_chinese_name(character: str = None) -> str:
+def get_chinese_name(character: str = '') -> str:
     """获取中文角色名"""
     if character and character in CHINESE_NAMES:
         return character
     return random.choice(CHINESE_NAMES)
 
 
-def format_player_list(players: List[AgentBase], show_roles: bool = False) -> str:
+def format_player_list(players: Sequence[AgentBase], show_roles: bool = False) -> str:
     """格式化玩家列表为中文显示"""
     if not players:
         return "无玩家"

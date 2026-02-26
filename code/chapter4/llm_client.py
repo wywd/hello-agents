@@ -1,7 +1,8 @@
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
-from typing import List, Dict
+from typing import List, Dict, Optional, cast
+from openai.types.chat import ChatCompletionMessageParam
 
 # 加载 .env 文件中的环境变量
 load_dotenv()
@@ -11,7 +12,7 @@ class HelloAgentsLLM:
     为本书 "Hello Agents" 定制的LLM客户端。
     它用于调用任何兼容OpenAI接口的服务，并默认使用流式响应。
     """
-    def __init__(self, model: str = None, apiKey: str = None, baseUrl: str = None, timeout: int = None):
+    def __init__(self, model: Optional[str] = None, apiKey: Optional[str] = None, baseUrl: Optional[str] = None, timeout: Optional[int] = None):
         """
         初始化客户端。优先使用传入参数，如果未提供，则从环境变量加载。
         """
@@ -29,28 +30,33 @@ class HelloAgentsLLM:
         """
         调用大语言模型进行思考，并返回其响应。
         """
+        assert self.model is not None, "模型ID必须被提供或在.env文件中定义。"
         print(f"🧠 正在调用 {self.model} 模型...")
         try:
+            messages_param = cast(List[ChatCompletionMessageParam], messages)
             response = self.client.chat.completions.create(
                 model=self.model,
-                messages=messages,
+                messages=messages_param,
                 temperature=temperature,
                 stream=True,
             )
-            
+
             # 处理流式响应
             print("✅ 大语言模型响应成功:")
             collected_content = []
             for chunk in response:
-                content = chunk.choices[0].delta.content or ""
-                print(content, end="", flush=True)
-                collected_content.append(content)
+                # 安全地获取内容，避免 index out of range
+                if chunk.choices and len(chunk.choices) > 0:
+                    delta_content = chunk.choices[0].delta.content
+                    if delta_content:
+                        print(delta_content, end="", flush=True)
+                        collected_content.append(delta_content)
             print()  # 在流式输出结束后换行
             return "".join(collected_content)
 
         except Exception as e:
             print(f"❌ 调用LLM API时发生错误: {e}")
-            return None
+            return "" # 返回空字符串表示失败
 
 # --- 客户端使用示例 ---
 if __name__ == '__main__':

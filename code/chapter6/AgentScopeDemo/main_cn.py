@@ -24,6 +24,7 @@ from structured_output_cn import (
     WerewolfKillModelCN
 )
 from utils_cn import (
+    CHINESE_NAMES,
     check_winning_cn,
     majority_vote_cn,
     get_chinese_name,
@@ -32,6 +33,10 @@ from utils_cn import (
     MAX_GAME_ROUND,
     MAX_DISCUSSION_ROUND,
 )
+
+from dotenv import load_dotenv
+# 加载环境变量
+load_dotenv()
 
 
 class ThreeKingdomsWerewolfGame:
@@ -61,9 +66,9 @@ class ThreeKingdomsWerewolfGame:
             name=name,
             sys_prompt=ChinesePrompts.get_role_prompt(role, character),
             model=DashScopeChatModel(
-                model_name="qwen-max",
-                api_key=os.environ["DASHSCOPE_API_KEY"],
-                enable_thinking=True,
+                model_name="deepseek-v3.2",
+                api_key=os.getenv("DASHSCOPE_API_KEY", ""),
+                enable_thinking=False,
             ),
             formatter=DashScopeMultiAgentFormatter(),
         )
@@ -89,8 +94,7 @@ class ThreeKingdomsWerewolfGame:
             "刘备", "关羽", "张飞", "诸葛亮", "赵云",
             "曹操", "司马懿", "周瑜", "孙权"
         ], player_count)
-        
-        # 创建玩家
+
         for i, (role, character) in enumerate(zip(roles, characters)):
             agent = await self.create_player(role, character)
             self.alive_players.append(agent)
@@ -311,7 +315,7 @@ class ThreeKingdomsWerewolfGame:
     async def run_game(self):
         """运行游戏主循环"""
         try:
-            await self.setup_game()
+            await self.setup_game(player_count=5)
             
             for round_num in range(1, MAX_GAME_ROUND + 1):
                 print(f"\n🌙 === 第{round_num}轮游戏开始 ===")
@@ -368,7 +372,7 @@ class ThreeKingdomsWerewolfGame:
 async def main():
     """主函数"""
     # 检查环境变量
-    if "DASHSCOPE_API_KEY" not in os.environ:
+    if not os.getenv("DASHSCOPE_API_KEY", ""):
         print("❌ 请设置环境变量 DASHSCOPE_API_KEY")
         return
     

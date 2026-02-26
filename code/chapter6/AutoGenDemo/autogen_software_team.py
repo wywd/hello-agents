@@ -11,18 +11,33 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 先测试一个版本，使用 OpenAI 客户端
+from autogen_core.models import ModelFamily
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
 from autogen_agentchat.teams import RoundRobinGroupChat
 from autogen_agentchat.conditions import TextMentionTermination
 from autogen_agentchat.ui import Console
 
+# test
+# print(f"API Key: {os.getenv('LLM_API_KEY')}...")
+# print(f"Base URL: {os.getenv('LLM_BASE_URL')}")
+# print(f"Model: {os.getenv('LLM_MODEL_ID')}")
+# exit(0)
+
 def create_openai_model_client():
+    # 核心：配置自定义模型的 config_list（AutoGen 推荐方式）
     """创建 OpenAI 模型客户端用于测试"""
     return OpenAIChatCompletionClient(
-        model=os.getenv("LLM_MODEL_ID", "gpt-4o"),
-        api_key=os.getenv("LLM_API_KEY"),
-        base_url=os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+        model=os.getenv("LLM_MODEL_ID", "gpt-4o-free"),
+        api_key=os.getenv("LLM_API_KEY", ""),
+        base_url=os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
+        model_info={
+        "function_calling": True,
+        "vision": False,
+        "json_output": True,
+        "family": ModelFamily.UNKNOWN,
+        "structured_output": True,
+        }
     )
 
 def create_product_manager(model_client):
@@ -121,7 +136,7 @@ async def run_software_development_team():
     # 先使用标准的 OpenAI 客户端测试
     model_client = create_openai_model_client()
     
-    print("👥 正在创建智能体团队...")
+    print("👥 正在创建智能体团队...model_client:", model_client)
     
     # 创建智能体团队
     product_manager = create_product_manager(model_client)
@@ -158,7 +173,7 @@ async def run_software_development_team():
 - 添加适当的错误处理和加载状态
 
 请团队协作完成这个任务，从需求分析到最终实现。"""
-    
+
     # 执行团队协作
     print("🚀 启动 AutoGen 软件开发团队协作...")
     print("=" * 60)
