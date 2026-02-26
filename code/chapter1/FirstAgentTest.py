@@ -23,8 +23,14 @@ Action的格式必须是以下之一：
 请开始吧！
 """
 
-
+import os
+import json
+from dotenv import load_dotenv
+load_dotenv("code/chapter1/.env")
+from tavily import TavilyClient
 import requests
+from dataclasses import is_dataclass, asdict
+from typing import Any
 
 def get_weather(city: str) -> str:
     """
@@ -56,10 +62,26 @@ def get_weather(city: str) -> str:
         # 处理数据解析错误
         return f"错误：解析天气数据失败，可能是城市名称无效 - {e}"
 
-
-
-import os
-from tavily import TavilyClient
+def to_primitive(obj: Any):
+    if obj is None or isinstance(obj, (str, int, float, bool)):
+        return obj
+    if isinstance(obj, dict):
+        return {k: to_primitive(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [to_primitive(v) for v in obj]
+    if is_dataclass(obj):
+        return to_primitive(asdict(obj))
+    if hasattr(obj, "to_dict"):
+        try:
+            return to_primitive(obj.to_dict())
+        except Exception:
+            pass
+    if hasattr(obj, "__dict__"):
+        return to_primitive(vars(obj))
+    try:
+        return json.loads(json.dumps(obj))
+    except Exception:
+        return str(obj)
 
 def get_attraction(city: str, weather: str) -> str:
     """
@@ -109,6 +131,7 @@ available_tools = {
 }
 
 from openai import OpenAI
+from typing import Any, cast
 
 class OpenAICompatibleClient:
     """
@@ -122,18 +145,20 @@ class OpenAICompatibleClient:
         """调用LLM API来生成回应。"""
         print("正在调用大语言模型...")
         try:
-            messages = [
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': prompt}
-            ]
+            messages = cast(Any, [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ])
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 stream=False
             )
+            print("LLM API 输入:", json.dumps(to_primitive(messages), ensure_ascii=False, indent=2 ,default=str))
+            print("LLM API 响应:", json.dumps(to_primitive(response), ensure_ascii=False, indent=2 ,default=str))
             answer = response.choices[0].message.content
             print("大语言模型响应成功。")
-            return answer
+            return str(answer)
         except Exception as e:
             print(f"调用LLM API时发生错误: {e}")
             return "错误：调用语言模型服务时出错。"
@@ -142,10 +167,14 @@ import re
 
 # --- 1. 配置LLM客户端 ---
 # 请根据您使用的服务，将这里替换成对应的凭证和地址
-API_KEY = "YOUR_API_KEY"
-BASE_URL = "YOUR_BASE_URL"
-MODEL_ID = "YOUR_MODEL_ID"
-os.environ['TAVILY_API_KEY'] = "YOUR_TAVILY_API_KEY"
+API_KEY = os.environ.get("OPENAI_API_KEY")
+BASE_URL = os.environ.get("OPENAI_BASE_URL")
+MODEL_ID = os.environ.get("MODEL_NAME")
+
+if not API_KEY or not BASE_URL or not MODEL_ID:
+    raise ValueError("错误：未配置必要的环境变量 OPENAI_API_KEY、OPENAI_BASE_URL 和 MODEL_NAME")
+
+print(f"使用的LLM模型: {MODEL_ID}，API地址: {BASE_URL}, api_key: {'已隐藏' if API_KEY else '未配置'}")
 
 llm = OpenAICompatibleClient(
     model=MODEL_ID,
@@ -154,7 +183,7 @@ llm = OpenAICompatibleClient(
 )
 
 # --- 2. 初始化 ---
-user_prompt = "你好，请帮我查询一下今天北京的天气，然后根据天气推荐一个合适的旅游景点。"
+user_prompt = "你好，请帮我查询一下今天宜昌的天气，然后根据天气推荐一个合适的旅游景点。"
 prompt_history = [f"用户请求: {user_prompt}"]
 
 print(f"用户输入: {user_prompt}\n" + "="*40)
@@ -168,6 +197,7 @@ for i in range(5): # 设置最大循环次数
     
     # 3.2. 调用LLM进行思考
     llm_output = llm.generate(full_prompt, system_prompt=AGENT_SYSTEM_PROMPT)
+    print(f"原始模型输出 llm_output=:\n{llm_output}\n")
     # 模型可能会输出多余的Thought-Action，需要截断
     match = re.search(r'(Thought:.*?Action:.*?)(?=\n\s*(?:Thought:|Action:|Observation:)|\Z)', llm_output, re.DOTALL)
     if match:
@@ -204,5 +234,5 @@ for i in range(5): # 设置最大循环次数
 
     # 3.4. 记录观察结果
     observation_str = f"Observation: {observation}"
-    print(f"{observation_str}\n" + "="*40)
+    print(f"observation = {observation_str}\n" + "="*40)
     prompt_history.append(observation_str)

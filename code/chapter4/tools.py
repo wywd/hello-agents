@@ -4,7 +4,7 @@ load_dotenv()
 
 import os
 from serpapi import SerpApiClient
-from typing import Dict, Any
+from typing import Dict, Any, Callable, Optional
 
 def search(query: str) -> str:
     """
@@ -27,16 +27,21 @@ def search(query: str) -> str:
         
         client = SerpApiClient(params)
         results = client.get_dict()
+        # print("✅ 搜索成功，结果:" + str(results))
         
         # 智能解析：优先寻找最直接的答案
         if "answer_box_list" in results:
+            print("通过 answer_box_list 找到直接答案。")
             return "\n".join(results["answer_box_list"])
         if "answer_box" in results and "answer" in results["answer_box"]:
+            print("通过 answer_box 找到直接答案。")
             return results["answer_box"]["answer"]
         if "knowledge_graph" in results and "description" in results["knowledge_graph"]:
+            print("通过 knowledge_graph 找到相关信息。")
             return results["knowledge_graph"]["description"]
         if "organic_results" in results and results["organic_results"]:
             # 如果没有直接答案，则返回前三个有机结果的摘要
+            print("没有直接答案，返回前三个有机结果的摘要。")
             snippets = [
                 f"[{i+1}] {res.get('title', '')}\n{res.get('snippet', '')}"
                 for i, res in enumerate(results["organic_results"][:3])
@@ -57,7 +62,7 @@ class ToolExecutor:
     def __init__(self):
         self.tools: Dict[str, Dict[str, Any]] = {}
 
-    def registerTool(self, name: str, description: str, func: callable):
+    def registerTool(self, name: str, description: str, func: Callable[..., Any]) -> None:
         """
         向工具箱中注册一个新工具。
         """
@@ -67,7 +72,7 @@ class ToolExecutor:
         self.tools[name] = {"description": description, "func": func}
         print(f"工具 '{name}' 已注册。")
 
-    def getTool(self, name: str) -> callable:
+    def getTool(self, name: str) -> Optional[Callable[..., Any]]:
         """
         根据名称获取一个工具的执行函数。
         """

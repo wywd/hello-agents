@@ -29,12 +29,21 @@ class SearchState(TypedDict):
     step: str             # 当前步骤
 
 # 初始化模型和Tavily客户端
+MODEL = os.getenv("LLM_MODEL_ID", "gpt-4o-mini")
+API_KEY = os.getenv("LLM_API_KEY", "")
+BASE_URL = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+
+print(f"🔧 初始化LLM: {MODEL}, API_KEY: {API_KEY[:5]}..., BASE_URL: {BASE_URL}")
+
 llm = ChatOpenAI(
-    model=os.getenv("LLM_MODEL_ID", "gpt-4o-mini"),
-    api_key=os.getenv("LLM_API_KEY"),
-    base_url=os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
-    temperature=0.7
-)
+    model=MODEL,
+    api_key=API_KEY,
+    base_url=BASE_URL,
+    temperature=0.7)
+
+# test llm
+response = llm.invoke([HumanMessage(content="你是谁？LLM是否连接成功？")])
+print(f"✅ LLM连接成功，测试响应: {response.content}")
 
 # 初始化Tavily客户端
 tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
@@ -59,7 +68,10 @@ def understand_query_node(state: SearchState) -> SearchState:
 理解：[用户需求总结]
 搜索词：[最佳搜索关键词]"""
 
-    response = llm.invoke([SystemMessage(content=understand_prompt)])
+    response = llm.invoke([
+        SystemMessage(content=understand_prompt),
+        HumanMessage(content="请根据上述要求，处理我的请求并给出回复") 
+        ])
     
     # 提取搜索关键词
     response_text = response.content
@@ -112,7 +124,7 @@ def tavily_search_node(state: SearchState) -> SearchState:
         
         if not search_results:
             search_results = "抱歉，没有找到相关信息。"
-        
+
         return {
             "search_results": search_results,
             "step": "searched",
@@ -130,25 +142,7 @@ def tavily_search_node(state: SearchState) -> SearchState:
         }
 
 def generate_answer_node(state: SearchState) -> SearchState:
-    """步骤3：基于搜索结果生成最终答案"""
-    
-    # 检查是否有搜索结果
-    if state["step"] == "search_failed":
-        # 如果搜索失败，基于LLM知识回答
-        fallback_prompt = f"""搜索API暂时不可用，请基于您的知识回答用户的问题：
-
-用户问题：{state['user_query']}
-
-请提供一个有用的回答，并说明这是基于已有知识的回答。"""
-        
-        response = llm.invoke([SystemMessage(content=fallback_prompt)])
-        
-        return {
-            "final_answer": response.content,
-            "step": "completed",
-            "messages": [AIMessage(content=response.content)]
-        }
-    
+    """步骤3：基于搜索结果生成最终答案"""  
     # 基于搜索结果生成答案
     answer_prompt = f"""基于以下搜索结果为用户提供完整、准确的答案：
 
@@ -163,14 +157,41 @@ def generate_answer_node(state: SearchState) -> SearchState:
 3. 引用重要信息的来源
 4. 回答要结构清晰、易于理解
 5. 如果搜索结果不够完整，请说明并提供补充建议"""
-
-    response = llm.invoke([SystemMessage(content=answer_prompt)])
+    
+    response = llm.invoke([
+        SystemMessage(content=answer_prompt),
+        HumanMessage(content="请根据上述要求，处理我的请求并给出回复")
+        ])
     
     return {
         "final_answer": response.content,
         "step": "completed",
         "messages": [AIMessage(content=response.content)]
     }
+
+def generate_fallback_answer_node(state: SearchState) -> SearchState:
+    print("⚠️ 搜索失败，正在基于LLM知识生成回答...")
+    # 如果搜索失败，基于LLM知识回答
+    fallback_prompt = f"""搜索API暂时不可用，请基于您的知识回答用户的问题：
+
+用户问题：{state['user_query']}
+
+请提供一个有用的回答，并说明这是基于已有知识的回答。"""
+        
+    response = llm.invoke([SystemMessage(content=fallback_prompt), 
+                           HumanMessage(content="请根据上述要求，处理我的请求并给出回复")])
+        
+    return {
+            "final_answer": response.content,
+            "step": "completed",
+            "messages": [AIMessage(content=response.content)]
+        }
+
+def routing_function(state: SearchState) -> bool:
+    """根据搜索结果是否成功路由到不同的节点"""
+    print(f"🔀 路由判断: 当前步骤 - {state['step']}")
+    return state["step"] == "searched"
+
 
 # 构建搜索工作流
 def create_search_assistant():
@@ -180,12 +201,15 @@ def create_search_assistant():
     workflow.add_node("understand", understand_query_node)
     workflow.add_node("search", tavily_search_node)
     workflow.add_node("answer", generate_answer_node)
+    workflow.add_node("fallback", generate_fallback_answer_node)
     
     # 设置线性流程
     workflow.add_edge(START, "understand")
     workflow.add_edge("understand", "search")
-    workflow.add_edge("search", "answer")
+    workflow.add_conditional_edges('search', routing_function, {True: "answer", False: "fallback"})
+    # workflow.add_edge("search", "answer")
     workflow.add_edge("answer", END)
+    workflow.add_edge("fallback", END)
     
     # 编译图
     memory = InMemorySaver()
