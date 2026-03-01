@@ -1,4 +1,6 @@
 # my_main.py
+import os
+
 from dotenv import load_dotenv
 from my_llm import MyLLM # 注意：这里导入我们自己的类
 
@@ -6,7 +8,13 @@ from my_llm import MyLLM # 注意：这里导入我们自己的类
 load_dotenv()
 
 # 实例化我们重写的客户端，并指定provider
-llm = MyLLM(provider="modelscope") 
+llm = MyLLM(
+    model=os.getenv("LLM_MODEL_ID", "gpt-5-mini"),
+    api_key=os.getenv("LLM_API_KEY"),
+    base_url=os.getenv("LLM_BASE_URL", "https://aihubmix.com/v1/")
+)
+
+print('llm = ', llm.provider)
 
 # 准备消息
 messages = [{"role": "user", "content": "你好，请介绍一下你自己。"}]
