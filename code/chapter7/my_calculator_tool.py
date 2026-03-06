@@ -41,10 +41,12 @@ def _eval_node(node, operators, functions):
         op = operators.get(type(node.op))
         return op(left, right)
     elif isinstance(node, ast.Call):
-        func_name = node.func.id
-        if func_name in functions:
-            args = [_eval_node(arg, operators, functions) for arg in node.args]
-            return functions[func_name](*args)
+        if isinstance(node.func, ast.Name):
+            func_name = node.func.id
+            if func_name in functions:
+                args = [_eval_node(arg, operators, functions) for arg in node.args]
+                return functions[func_name](*args)
+        raise ValueError(f"不支持的函数调用格式: {ast.unparse(node)}")
     elif isinstance(node, ast.Name):
         if node.id in functions:
             return functions[node.id]
