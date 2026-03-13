@@ -27,7 +27,7 @@ def memory_tool_execute_demo():
     
     return memory_tool
 
-def add_memory_demo(memory_tool):
+def add_memory_demo(memory_tool: MemoryTool):
     """添加记忆演示 - 模拟人类记忆编码过程"""
     print("\n📝 添加记忆演示")
     print("-" * 30)
@@ -75,7 +75,7 @@ def add_memory_demo(memory_tool):
     })
     print(f"感知记忆: {result}")
 
-def search_memory_demo(memory_tool):
+def search_memory_demo(memory_tool: MemoryTool):
     """搜索记忆演示 - 实现语义理解的检索"""
     print("\n🔍 搜索记忆演示")
     print("-" * 30)
@@ -105,7 +105,7 @@ def search_memory_demo(memory_tool):
     })
     print(result)
 
-def memory_summary_demo(memory_tool):
+def memory_summary_demo(memory_tool: MemoryTool):
     """记忆摘要演示 - 提供系统全貌"""
     print("\n📋 记忆摘要演示")
     print("-" * 30)
